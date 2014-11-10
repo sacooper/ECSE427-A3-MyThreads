@@ -2,7 +2,7 @@
  * MyThreads.c
  * 	Scott Cooper
  * 	260503452
- *2
+ *
  *  ECSE 427/COMP 310
  */
 

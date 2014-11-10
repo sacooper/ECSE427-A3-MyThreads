@@ -34,6 +34,7 @@ struct sigaction sa;
 int thread_count,	// Total number of threads
 	sem_count,		// Total number of threads
 	quantum,		// Current quantum size
+	running_threads,// Number of currently executing threads (not including main)
 	current_thread;	// ID of currently executing thread
 
 // Timer to control SIGALRM
@@ -61,6 +62,7 @@ int mythread_init() {
 	TAILQ_INIT(&running_queue);	// Initialize running queue
 	thread_count = 1;
 	sem_count = 0;
+	running_threads = 0;
 
 	quantum = QUANTUM_INIT;
 	current_thread = 0;
@@ -124,12 +126,13 @@ int mythread_create(char *threadname, void (*threadfunc)(), int stacksize) {
 
 	this->id = new->id;
 	TAILQ_INSERT_TAIL(&running_queue, this, tailq);
-
+	running_threads++;
 	return 0;
 }
 
 // Perform the switch between current thread and next in runqueue
 void thread_switch(){
+	printf(".");
 	if (!TAILQ_EMPTY(&running_queue)){	// only swap if there's something to swap
 		thread_control_block *current, *next;
 		thread_queue_entry *next_t;
@@ -147,7 +150,7 @@ void thread_switch(){
 		last_swap = clock();
 
 		// Save the current thread if it is still runnable (not blocked/exited)
-		if (current->state == RUNNABLE && current->id != 0){
+		if (current->state == RUNNABLE && (current-> id != 0)){
 			thread_queue_entry *this = malloc(sizeof(thread_queue_entry));
 			this->id = current->id;
 			TAILQ_INSERT_TAIL(&running_queue, this, tailq);}
@@ -161,11 +164,19 @@ void thread_switch(){
 // Exit a thread, setting the state to EXIT
 void mythread_exit() {
 	sigprocmask(SIG_BLOCK, &(sa.sa_mask), NULL);
+
 	thread_control_block *current = &(threads[current_thread]);
 	current->state = EXIT;
 	clock_t now = clock();
 	current->time += (now - last_swap);
 	last_swap = clock();
+	printf("EXIT: %d\n", --running_threads);
+	if (running_threads == 0){
+		printf("HERE");
+		setitimer(ITIMER_REAL, NULL, 0);
+		sigprocmask(SIG_UNBLOCK, &(sa.sa_mask), NULL);
+		swapcontext(current->context, threads[0].context);
+	}
 	sigprocmask(SIG_UNBLOCK, &(sa.sa_mask), NULL);
 }
 
@@ -197,13 +208,8 @@ void runthreads() {
 			setitimer(ITIMER_REAL, &tval, 0);
 			int running = 1, i = 0;
 			swapcontext(main_thread->context, next->context);
-			while(running){
-				running = 0;
-				for (i = 1; i <=thread_count; i++){
-
-					if (threads[i].state != EXIT)
-						running = 1;
-				}
+			while(running_threads > 0){
+				thread_switch();
 			}
 	}
 }
@@ -283,52 +289,11 @@ void destroy_semaphore(int semaphore) {
 
 // Print out the current state of the program in table form
 void mythread_state() {
-	int i;
+	int i = 1;
 	printf("%3s: %15s %10s %8s\n", "ID", "Thread Name", "State", "Time");
 	printf("----------------------------------------\n");
 	while(threads[i].context != NULL){
 		printf("%3d: %15s %10s %8d\n", i, threads[i].thread_name, state_string[threads[i].state], threads[i].time);
 		i++;
 	}
-}
-
-void test1(){
-
-	semaphore_wait(0);
-
-	printf("HERE1\n");
-
-	semaphore_signal(0);
-
-	mythread_exit();
-}
-
-void test2(){
-	printf("HERE2\n");
-
-	semaphore_signal(0);
-
-	mythread_exit();
-}
-
-void test3(){
-	semaphore_wait(0);
-	printf("HERE3\n");
-
-	mythread_exit();
-}
-
-int main(){
-	mythread_init();
-	mythread_create("TEST1", &test1, 64000);
-	mythread_create("TEST2", &test2, 64000);
-	mythread_create("TEST3", &test3, 64000);
-
-	create_semaphore(0);
-
-	runthreads();
-
-	mythread_state();
-
-	return 0;
 }

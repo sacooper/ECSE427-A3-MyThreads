@@ -81,6 +81,7 @@ int mythread_init() {
 
 	if (main_thread.context->uc_stack.ss_sp == NULL)	// malloc failed
 		return -1;
+
 	main_thread.context->uc_stack.ss_size = sizeof(main_thread.context->uc_stack);
 	main_thread.state = RUNNABLE;
 	main_thread.time = clock();
@@ -114,6 +115,7 @@ int mythread_create(char *threadname, void (*threadfunc)(), int stacksize) {
 	new->context->uc_link = threads[0].context;
 	new->thread_name = strdup(threadname);
 	new->time = 0;
+
 	new->state = RUNNABLE;
 	new->id = thread_count++;
 	makecontext(new->context, threadfunc, 0);
@@ -132,7 +134,6 @@ int mythread_create(char *threadname, void (*threadfunc)(), int stacksize) {
 
 // Perform the switch between current thread and next in runqueue
 void thread_switch(){
-	printf(".");
 	if (!TAILQ_EMPTY(&running_queue)){	// only swap if there's something to swap
 		thread_control_block *current, *next;
 		thread_queue_entry *next_t;
@@ -170,9 +171,8 @@ void mythread_exit() {
 	clock_t now = clock();
 	current->time += (now - last_swap);
 	last_swap = clock();
-	printf("EXIT: %d\n", --running_threads);
+	running_threads--;
 	if (running_threads == 0){
-		printf("HERE");
 		setitimer(ITIMER_REAL, NULL, 0);
 		sigprocmask(SIG_UNBLOCK, &(sa.sa_mask), NULL);
 		swapcontext(current->context, threads[0].context);
@@ -206,7 +206,6 @@ void runthreads() {
 			last_swap = clock();
 
 			setitimer(ITIMER_REAL, &tval, 0);
-			int running = 1, i = 0;
 			swapcontext(main_thread->context, next->context);
 			while(running_threads > 0){
 				thread_switch();

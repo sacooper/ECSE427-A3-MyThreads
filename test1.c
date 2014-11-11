@@ -11,38 +11,49 @@
 
 #include "MyThreads.h"
 
-void test1(){
+int sem;
 
-	semaphore_wait(0);
+void a(){
 
-	printf("HERE1\n");
+	printf("a() waiting on sem: %d\n", sem);
+	semaphore_wait(sem);
 
-	semaphore_signal(0);
+	printf("a()\n");
 
+	printf("a() signaling sem: %d\n", sem);
+	semaphore_signal(sem);
+
+	printf("a() exiting\n");
 	mythread_exit();
 }
 
-void test2(){
-	printf("HERE2\n");
+void b(){
+	printf("b()\n");
 
-	semaphore_signal(0);
+	printf("b() signaling sem: %d\n", sem);
+	semaphore_signal(sem);
 
+	printf("b() exiting\n");
 	mythread_exit();
 }
 
-void test3(){
-	semaphore_wait(0);
-	printf("HERE3\n");
+void c(){
+	printf("c() waiting on sem: %d\n", sem);
+	semaphore_wait(sem);
+
+	printf("c()\n");
+
+	printf("c() exiting\n");
 	mythread_exit();
 }
 
 int main(){
 	mythread_init();
-	mythread_create("TEST1", &test1, 64000);
-	mythread_create("TEST2", &test2, 64000);
-	mythread_create("TEST3", &test3, 64000);
+	mythread_create("A", &a, 64000);
+	mythread_create("B", &b, 64000);
+	mythread_create("C", &c, 64000);
 
-	int sem = create_semaphore(0);
+	sem = create_semaphore(0);
 
 	runthreads();
 

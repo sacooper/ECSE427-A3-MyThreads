@@ -10,7 +10,6 @@
 #define ASSIGNMENT3_THREADPACKAGE_MYTHREADS_H_
 
 #include <sys/queue.h>
-#include <time.h>
 #include <ucontext.h>
 
 #define MAX_THREADS 64
@@ -31,7 +30,7 @@ typedef struct thread_control_block {
 	char* thread_name;
 	int id;
 	enum RUNNING_STATE state;
-	clock_t time;
+	long time;
 } thread_control_block;
 
 typedef struct sem_entry {

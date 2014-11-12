@@ -25,9 +25,6 @@ thread_control_block threads[MAX_THREADS];
 // Table containing all current in use semaphores
 sem_entry sems[MAX_SEM];
 
-// Time since last swap
-clock_t last_swap;
-
 // sigaction struct for SIGALRM
 struct sigaction sa;
 
@@ -49,8 +46,8 @@ void cleanup(){
 	}
 	thread_queue_entry *item;
     while ((item = TAILQ_FIRST(&running_queue))) {
-		TAILQ_REMOVE(&running_queue, item, tailq);
-		free(item);
+			TAILQ_REMOVE(&running_queue, item, tailq);
+			free(item);
     }
 	for (i = 0; i < sem_count; i++){
 		free(sems[i].waiting_queue);
@@ -84,7 +81,7 @@ int mythread_init() {
 
 	main_thread.context->uc_stack.ss_size = sizeof(main_thread.context->uc_stack);
 	main_thread.state = RUNNABLE;
-	main_thread.time = clock();
+	main_thread.time = 0;
 	main_thread.thread_name = "main_thread";
 	main_thread.id = 0;
 	threads[0] = main_thread;
@@ -145,10 +142,7 @@ void thread_switch(){
 
 		TAILQ_REMOVE(&running_queue, next_t, tailq);
 		free(next_t);
-		clock_t now;
-		now = clock();
-		current->time += (now - last_swap);
-		last_swap = clock();
+		current->time += quantum;
 
 		// Save the current thread if it is still runnable (not blocked/exited)
 		if (current->state == RUNNABLE && (current-> id != 0)){
@@ -168,9 +162,7 @@ void mythread_exit() {
 
 	thread_control_block *current = &(threads[current_thread]);
 	current->state = EXIT;
-	clock_t now = clock();
-	current->time += (now - last_swap);
-	last_swap = clock();
+	current->time += quantum;
 	running_threads--;
 	if (running_threads == 0){
 		setitimer(ITIMER_REAL, NULL, 0);
@@ -191,7 +183,6 @@ void runthreads() {
 	tval.it_interval.tv_usec = quantum;
 	tval.it_value.tv_sec = 0;
 	tval.it_value.tv_usec = quantum;
-	last_swap = clock();
 
 	if (!TAILQ_EMPTY(&running_queue)){	// only swap if there's something to swap
 			thread_control_block *main_thread = &(threads[0]);
@@ -200,10 +191,7 @@ void runthreads() {
 			current_thread = next_t->id;
 			TAILQ_REMOVE(&running_queue, next_t, tailq);
 			free(next_t);
-			clock_t now;
-			now = clock();
-			main_thread->time += (now - last_swap);
-			last_swap = clock();
+			main_thread->time += quantum;
 
 			setitimer(ITIMER_REAL, &tval, 0);
 			swapcontext(main_thread->context, next->context);
@@ -292,7 +280,7 @@ void mythread_state() {
 	printf("%3s: %15s %10s %8s\n", "ID", "Thread Name", "State", "Time");
 	printf("----------------------------------------\n");
 	while(threads[i].context != NULL){
-		printf("%3d: %15s %10s %8d\n", i, threads[i].thread_name, state_string[threads[i].state], threads[i].time);
+		printf("%3d: %15s %10s %8ld\n", i, threads[i].thread_name, state_string[threads[i].state], threads[i].time);
 		i++;
 	}
 }
